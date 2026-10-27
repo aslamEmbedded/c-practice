@@ -1,0 +1,1846 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>C Beast Mode</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column workbench. Header with rank trace, tab row, then the active view.
+   Palette: solder-mask green board, copper accent, silkscreen-style condensed labels. */
+:root{
+  --bg:#EDF1EC; --surface:#F7F9F5; --raised:#FFFFFF; --ink:#12261E; --muted:#566B61; --line:#C9D5CC;
+  --accent:#A5560F; --on-accent:#FFFFFF; --good:#1D7448; --bad:#B0352C;
+  --code-bg:#0E2A21; --code-ink:#D6EADB; --c-kw:#E7A964; --c-str:#9ED3A8; --c-com:#78978A; --c-num:#92C5EC; --c-pre:#C9A6E8;
+  --h0:#DCE5DE; --h1:#EBCDA8; --h2:#D18B45; --h3:#A5560F;
+  --font-display:'Barlow Condensed','Arial Narrow',system-ui,sans-serif;
+  --font-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0A1612; --surface:#10221B; --raised:#152B23; --ink:#E3EEE7; --muted:#92A99E; --line:#26433A;
+    --accent:#E48F42; --on-accent:#1B1006; --good:#4CC384; --bad:#F07A6E;
+    --code-bg:#07120E; --code-ink:#D6EADB;
+    --h0:#1B332B; --h1:#5A3A1B; --h2:#B4692A; --h3:#E48F42;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0A1612; --surface:#10221B; --raised:#152B23; --ink:#E3EEE7; --muted:#92A99E; --line:#26433A;
+  --accent:#E48F42; --on-accent:#1B1006; --good:#4CC384; --bad:#F07A6E;
+  --code-bg:#07120E; --code-ink:#D6EADB;
+  --h0:#1B332B; --h1:#5A3A1B; --h2:#B4692A; --h3:#E48F42;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:18px 56px}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3,p{margin:0}
+.app{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:18px;min-width:0}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.hdr{display:flex;flex-direction:column;gap:16px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.brand{font-family:var(--font-display);font-weight:700;font-size:38px;line-height:1;letter-spacing:.07em;text-transform:uppercase}
+.brand small{display:block;font-family:var(--font-body);font-weight:400;font-size:13px;letter-spacing:0;text-transform:none;color:var(--muted);margin-top:6px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{display:flex;flex-direction:column;min-width:78px;padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+.chip b{font-family:var(--font-display);font-weight:700;font-size:24px;line-height:1.05;font-variant-numeric:tabular-nums}
+.chip span{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.chip.on b{color:var(--accent)}
+
+.trace{position:relative;display:grid;grid-template-columns:repeat(6,1fr);padding-top:2px}
+.trace::before{content:"";position:absolute;top:11px;left:calc(100%/12);right:calc(100%/12);height:3px;background:var(--line);border-radius:2px}
+.trace .fill{position:absolute;top:11px;left:calc(100%/12);width:calc((100% - 100%/6) * var(--p,0));height:3px;background:var(--accent);border-radius:2px}
+.node{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;min-width:0}
+.node i{width:20px;height:20px;border-radius:50%;background:var(--bg);border:3px solid var(--line);display:block}
+.node.reached i{border-color:var(--accent);background:var(--accent)}
+.node.now i{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 25%,transparent)}
+.node span{font-size:11px;line-height:1.2;color:var(--muted);letter-spacing:.02em}
+.node.reached span{color:var(--ink);font-weight:600}
+.next-up{font-size:13px;color:var(--muted)}
+
+/* tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tab{appearance:none;background:none;border:0;border-bottom:3px solid transparent;padding:10px 14px 9px;cursor:pointer;
+  font-family:var(--font-display);font-weight:600;font-size:19px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.tab:hover{color:var(--ink)}
+
+/* common */
+.view{display:flex;flex-direction:column;gap:18px;min-width:0}
+.sec-h{font-family:var(--font-display);font-weight:600;font-size:22px;letter-spacing:.06em;text-transform:uppercase}
+.sub{color:var(--muted);font-size:14px}
+.card{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:14px 16px;min-width:0}
+.btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:8px 16px;border-radius:6px;
+  border:1px solid var(--line);background:var(--raised);cursor:pointer;font-weight:500;text-decoration:none;color:var(--ink)}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.sm{min-height:36px;padding:4px 12px;font-size:14px}
+.btn.armed{border-color:var(--bad);color:var(--bad)}
+.btn[disabled]{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.lbl{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.pips{display:inline-flex;gap:3px;vertical-align:middle}
+.pips i{width:8px;height:8px;border-radius:2px;background:var(--line);display:block}
+.pips i.on{background:var(--accent)}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.pill{display:inline-block;padding:1px 8px;border-radius:99px;border:1px solid var(--line);font-size:12px;color:var(--muted);white-space:nowrap}
+.pill.alone{color:var(--good);border-color:var(--good)}
+.pill.hint{color:var(--accent);border-color:var(--accent)}
+.pill.peek{color:var(--bad);border-color:var(--bad)}
+
+/* code */
+pre.code,pre.io{margin:0;font-family:var(--font-mono);font-size:13px;line-height:1.55;border-radius:6px;padding:12px 14px;overflow-x:auto;
+  background:var(--code-bg);color:var(--code-ink);tab-size:4}
+pre.io{min-height:44px;white-space:pre}
+.k{color:var(--c-kw)}.s{color:var(--c-str)}.c{color:var(--c-com);font-style:italic}.n{color:var(--c-num)}.p{color:var(--c-pre)}
+textarea.editor{width:100%;min-height:260px;resize:vertical;font-family:var(--font-mono);font-size:13px;line-height:1.55;tab-size:4;
+  background:var(--code-bg);color:var(--code-ink);border:1px solid var(--line);border-radius:6px;padding:12px 14px;white-space:pre;overflow:auto}
+
+/* mission */
+.mission{display:grid;gap:10px}
+.mc{display:grid;grid-template-columns:30px 1fr auto;gap:12px;align-items:center;width:100%;text-align:left;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:14px 16px}
+.mc:hover{border-color:var(--muted)}
+.pad{width:26px;height:26px;border-radius:50%;border:3px solid var(--line);display:grid;place-items:center;color:var(--on-accent)}
+.pad[data-s="alone"]{background:var(--good);border-color:var(--good)}
+.pad[data-s="hint"]{background:var(--accent);border-color:var(--accent)}
+.pad[data-s="peek"]{background:var(--bad);border-color:var(--bad)}
+.pad svg{width:14px;height:14px}
+.mc .slot{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600}
+.mc .t{font-weight:600;font-size:16px}
+.mc .m{font-size:13px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.mc .xp{font-family:var(--font-display);font-weight:600;font-size:20px;color:var(--muted);text-align:right;line-height:1}
+.mc .xp small{display:block;font-family:var(--font-body);font-size:11px;letter-spacing:.06em}
+.method{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.method li::marker{font-family:var(--font-mono);color:var(--accent);font-weight:500}
+
+/* problems list */
+.filters{display:flex;gap:8px;flex-wrap:wrap}
+.filters select,.filters input{min-height:40px;border:1px solid var(--line);background:var(--raised);border-radius:6px;padding:6px 10px;min-width:0}
+.filters input{flex:1 1 160px}
+.chipset{display:flex;gap:6px;flex-wrap:wrap}
+.fc{appearance:none;min-height:36px;padding:4px 12px;border-radius:99px;border:1px solid var(--line);background:var(--raised);cursor:pointer;font-size:13px}
+.fc[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.plist{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.pr{display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center;padding:11px 14px;border:0;border-top:1px solid var(--line);background:none;text-align:left;cursor:pointer;width:100%}
+.pr:first-child{border-top:0}
+.pr:hover{background:var(--raised)}
+.pr .num{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+.pr .t{font-weight:500}
+.pr .m{font-size:12px;color:var(--muted)}
+.empty{padding:22px;text-align:center;color:var(--muted)}
+
+/* problem detail */
+.back{align-self:flex-start}
+.meta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)}
+.prob h2{font-family:var(--font-display);font-weight:700;font-size:34px;line-height:1.05;letter-spacing:.03em;text-transform:uppercase;margin:6px 0 8px;text-wrap:balance}
+.io{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.io>div{min-width:0}
+.timer{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
+.help .btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.reveal{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.reveal ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
+.cap{font-size:13px;color:var(--muted)}
+.fin .btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.result{border:1px solid var(--good);border-radius:8px;padding:14px 16px;background:var(--surface);display:flex;flex-direction:column;gap:10px}
+.note{font-size:12px;color:var(--muted)}
+
+/* quiz */
+.opts{display:grid;gap:8px}
+.opt{appearance:none;text-align:left;min-height:48px;padding:10px 14px;border:1px solid var(--line);border-radius:6px;background:var(--raised);cursor:pointer;font-family:var(--font-mono);font-size:14px}
+.opt:hover{border-color:var(--muted)}
+.opt.right{border-color:var(--good);box-shadow:inset 0 0 0 1px var(--good)}
+.opt.wrong{border-color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+.opt[disabled]{cursor:default}
+.why{border-top:1px solid var(--line);padding-top:12px;display:flex;flex-direction:column;gap:10px}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+
+/* progress */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat b{display:block;font-family:var(--font-display);font-weight:700;font-size:30px;line-height:1.05;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.heat{display:grid;grid-template-rows:repeat(7,1fr);grid-template-columns:repeat(12,1fr);grid-auto-flow:column;gap:4px;max-width:420px}
+.heat i{aspect-ratio:1;border-radius:3px;background:var(--h0);display:block}
+.heat i[data-l="1"]{background:var(--h1)}.heat i[data-l="2"]{background:var(--h2)}.heat i[data-l="3"]{background:var(--h3)}
+.heat i[data-l="x"]{background:transparent}
+.lvrow{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center}
+.lvrow .nm{font-size:13px}
+.segs{display:flex;gap:3px;flex-wrap:wrap}
+.segs i{width:14px;height:14px;border-radius:3px;background:var(--h0);display:block}
+.segs i[data-s="alone"]{background:var(--good)}.segs i[data-s="hint"]{background:var(--accent)}.segs i[data-s="peek"]{background:var(--bad)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+textarea.bk{width:100%;min-height:90px;font-family:var(--font-mono);font-size:12px;border:1px solid var(--line);border-radius:6px;padding:8px 10px;background:var(--raised);resize:vertical}
+@media (max-width:480px){
+  .brand{font-size:32px}
+  .lvrow{grid-template-columns:1fr}
+  .mc{grid-template-columns:26px 1fr auto;gap:10px;padding:12px}
+  .prob h2{font-size:30px}
+}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+</style>
+<div class="app">
+<header class="hdr" id="hdr"></header>
+<nav class="tabs" id="tabs" role="tablist" aria-label="Sections"></nav>
+<main id="view"></main>
+</div>
+<script>
+const C = (s, ...v) => String.raw(s, ...v).replace(/^\n/, '');
+
+const PROBLEMS = [
+/* ---------- LEVEL 1 : WARM-UP ---------- */
+{ id: 1, lvl: 1, cat: 'Basics', title: 'Even or odd',
+  desc: 'Read one integer. Print Even if it divides by 2 with no remainder, otherwise print Odd.',
+  in: '7', out: 'Odd',
+  hints: ['What does n % 2 give for an even number? For an odd one?', 'In C, -3 % 2 is -1, not 1. Test for == 0 instead of == 1.'],
+  steps: ['Read n with scanf.', 'Compute the remainder n % 2.', 'Remainder 0 means Even. Anything else means Odd.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n;
+    scanf("%d", &n);
+    if (n % 2 == 0)
+        printf("Even\n");
+    else
+        printf("Odd\n");
+    return 0;
+}
+` },
+
+{ id: 2, lvl: 1, cat: 'Loops', title: 'FizzBuzz',
+  desc: 'Read N. For every number from 1 to N print Fizz if it divides by 3, Buzz if it divides by 5, FizzBuzz if it divides by both, otherwise the number itself. One per line.',
+  in: '15', out: '1\n2\nFizz\n4\nBuzz\nFizz\n7\n8\nFizz\nBuzz\n11\nFizz\n13\n14\nFizzBuzz',
+  hints: ['Which check must come first, and why?', 'A number divisible by 3 and 5 is divisible by 15.'],
+  steps: ['Loop i from 1 to N.', 'If i % 15 == 0 print FizzBuzz.', 'Else if i % 3 == 0 print Fizz, else if i % 5 == 0 print Buzz.', 'Otherwise print i.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n;
+    scanf("%d", &n);
+    for (int i = 1; i <= n; i++) {
+        if (i % 15 == 0)
+            printf("FizzBuzz\n");
+        else if (i % 3 == 0)
+            printf("Fizz\n");
+        else if (i % 5 == 0)
+            printf("Buzz\n");
+        else
+            printf("%d\n", i);
+    }
+    return 0;
+}
+` },
+
+{ id: 3, lvl: 1, cat: 'Basics', title: 'Largest of three',
+  desc: 'Read three integers and print the largest one.',
+  in: '14 92 37', out: '92',
+  hints: ['Keep a variable called max. Start it as the first number.', 'Compare the other two against max, one at a time.'],
+  steps: ['Set max = a.', 'If b > max, set max = b.', 'If c > max, set max = c.', 'Print max.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int a, b, c;
+    scanf("%d %d %d", &a, &b, &c);
+    int max = a;
+    if (b > max) max = b;
+    if (c > max) max = c;
+    printf("%d\n", max);
+    return 0;
+}
+` },
+
+{ id: 4, lvl: 1, cat: 'Basics', title: 'Swap without a third variable',
+  desc: 'Read two integers a and b. Swap their values without using a temporary variable, then print them.',
+  in: '3 9', out: '9 3',
+  hints: ['Store the sum in one of the variables first.', 'After a = a + b, you can recover each original by subtraction.'],
+  steps: ['a = a + b (a now holds both).', 'b = a - b (b becomes the old a).', 'a = a - b (a becomes the old b).', 'Print a and b. Note: a + b can overflow for huge values.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int a, b;
+    scanf("%d %d", &a, &b);
+    a = a + b;
+    b = a - b;
+    a = a - b;
+    printf("%d %d\n", a, b);
+    return 0;
+}
+` },
+
+{ id: 5, lvl: 1, cat: 'Numbers', title: 'Sum of digits',
+  desc: 'Read a positive integer and print the sum of its digits.',
+  in: '4821', out: '15',
+  hints: ['n % 10 gives the last digit.', 'n / 10 removes the last digit. Repeat until n is 0.'],
+  steps: ['Set sum = 0.', 'While n > 0: add n % 10 to sum.', 'Then do n = n / 10.', 'Print sum.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, sum = 0;
+    scanf("%d", &n);
+    if (n < 0) n = -n;
+    while (n > 0) {
+        sum += n % 10;
+        n /= 10;
+    }
+    printf("%d\n", sum);
+    return 0;
+}
+` },
+
+{ id: 6, lvl: 1, cat: 'Patterns', title: 'Star triangle',
+  desc: 'Read N and print a right-angled triangle of stars with N rows. Row i has i stars.',
+  in: '4', out: '*\n**\n***\n****',
+  hints: ['You need two loops. One for rows, one inside it for stars.', 'The inner loop runs as many times as the current row number.'],
+  steps: ['Outer loop i = 1 to N is the row.', 'Inner loop j = 1 to i prints one star each time.', 'After the inner loop, print a newline.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n;
+    scanf("%d", &n);
+    for (int i = 1; i <= n; i++) {
+        for (int j = 1; j <= i; j++)
+            printf("*");
+        printf("\n");
+    }
+    return 0;
+}
+` },
+
+{ id: 7, lvl: 1, cat: 'Numbers', title: 'Factorial',
+  desc: 'Read N (0 to 20) and print N factorial.',
+  in: '10', out: '3628800',
+  hints: ['Multiply 1 x 2 x 3 x ... x N in a loop.', '21! no longer fits in 64 bits. Use unsigned long long and print with %llu.'],
+  steps: ['Set f = 1.', 'Loop i from 2 to N and do f = f * i.', 'For N = 0 or 1 the loop never runs and f stays 1, which is correct.', 'Print f.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n;
+    unsigned long long f = 1;
+    scanf("%d", &n);
+    for (int i = 2; i <= n; i++)
+        f *= i;
+    printf("%llu\n", f);
+    return 0;
+}
+` },
+
+{ id: 8, lvl: 1, cat: 'Numbers', title: 'Fibonacci series',
+  desc: 'Read N and print the first N Fibonacci numbers starting from 0, separated by single spaces.',
+  in: '8', out: '0 1 1 2 3 5 8 13',
+  hints: ['Keep two variables: the current term and the next one.', 'Each step: new = a + b, then slide a and b forward.'],
+  steps: ['Set a = 0, b = 1.', 'Print a.', 'Compute next = a + b, then a = b, b = next.', 'Repeat N times. Print a space between terms but not after the last.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n;
+    scanf("%d", &n);
+    long long a = 0, b = 1;
+    for (int i = 0; i < n; i++) {
+        printf("%lld", a);
+        if (i < n - 1) printf(" ");
+        long long next = a + b;
+        a = b;
+        b = next;
+    }
+    printf("\n");
+    return 0;
+}
+` },
+
+/* ---------- LEVEL 2 : CORE ---------- */
+{ id: 9, lvl: 2, cat: 'Numbers', title: 'Reverse a number',
+  desc: 'Read a positive integer and print it with the digits reversed. Leading zeros of the result are dropped.',
+  in: '12340', out: '4321',
+  hints: ['Peel digits off the end with % 10.', 'Build the answer with rev = rev * 10 + digit.'],
+  steps: ['Set rev = 0.', 'While n > 0: digit = n % 10.', 'rev = rev * 10 + digit, then n = n / 10.', 'Trace 12340: rev goes 0, 4, 43, 432, 4321.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, rev = 0;
+    scanf("%d", &n);
+    while (n > 0) {
+        rev = rev * 10 + n % 10;
+        n /= 10;
+    }
+    printf("%d\n", rev);
+    return 0;
+}
+` },
+
+{ id: 10, lvl: 2, cat: 'Numbers', title: 'Prime check',
+  desc: 'Read an integer and print Prime or Not prime.',
+  in: '29', out: 'Prime',
+  hints: ['Numbers below 2 are not prime.', 'You only need to test divisors up to the square root of n. Write that as i * i <= n.'],
+  steps: ['If n < 2, it is not prime.', 'Loop i from 2 while i * i <= n.', 'If n % i == 0, it has a divisor, so not prime. Stop early.', 'If the loop finishes with no divisor, it is prime.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, isPrime = 1;
+    scanf("%d", &n);
+    if (n < 2) isPrime = 0;
+    for (int i = 2; i * i <= n; i++) {
+        if (n % i == 0) {
+            isPrime = 0;
+            break;
+        }
+    }
+    printf(isPrime ? "Prime\n" : "Not prime\n");
+    return 0;
+}
+` },
+
+{ id: 11, lvl: 2, cat: 'Patterns', title: 'Centered pyramid',
+  desc: 'Read N and print a centered pyramid of N rows. Row i has 2i-1 stars.',
+  in: '4', out: '   *\n  ***\n *****\n*******',
+  hints: ['Each row is spaces first, then stars.', 'Row i needs N - i spaces and 2 * i - 1 stars.'],
+  steps: ['Outer loop i = 1 to N.', 'First inner loop prints N - i spaces.', 'Second inner loop prints 2 * i - 1 stars.', 'Newline at the end of each row.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n;
+    scanf("%d", &n);
+    for (int i = 1; i <= n; i++) {
+        for (int s = 0; s < n - i; s++)
+            printf(" ");
+        for (int k = 0; k < 2 * i - 1; k++)
+            printf("*");
+        printf("\n");
+    }
+    return 0;
+}
+` },
+
+{ id: 12, lvl: 2, cat: 'Numbers', title: 'GCD and LCM',
+  desc: 'Read two positive integers. Print their GCD and LCM in the form GCD=x LCM=y.',
+  in: '12 18', out: 'GCD=6 LCM=36',
+  hints: ['Euclid: gcd(a, b) = gcd(b, a % b). Stop when b is 0.', 'LCM = a * b / gcd. Divide first (a / gcd * b) to avoid overflow.'],
+  steps: ['Copy a and b into x and y.', 'While y != 0: t = x % y, x = y, y = t.', 'When y hits 0, x is the GCD.', 'LCM = a / x * b.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int a, b;
+    scanf("%d %d", &a, &b);
+    int x = a, y = b;
+    while (y != 0) {
+        int t = x % y;
+        x = y;
+        y = t;
+    }
+    printf("GCD=%d LCM=%d\n", x, a / x * b);
+    return 0;
+}
+` },
+
+{ id: 13, lvl: 2, cat: 'Numbers', title: 'Palindrome number',
+  desc: 'Read a positive integer. Print Palindrome if it reads the same forwards and backwards, otherwise Not palindrome.',
+  in: '12321', out: 'Palindrome',
+  hints: ['You already know how to reverse a number.', 'Keep a copy of the original before you destroy n.'],
+  steps: ['Save original = n.', 'Reverse n into rev using the % 10 and / 10 loop.', 'Compare rev with original.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, original, rev = 0;
+    scanf("%d", &n);
+    original = n;
+    while (n > 0) {
+        rev = rev * 10 + n % 10;
+        n /= 10;
+    }
+    printf(rev == original ? "Palindrome\n" : "Not palindrome\n");
+    return 0;
+}
+` },
+
+{ id: 14, lvl: 2, cat: 'Numbers', title: 'Armstrong number',
+  desc: 'An Armstrong number equals the sum of its digits each raised to the power of the digit count (153 = 1 + 125 + 27). Read a number and print Armstrong or Not Armstrong.',
+  in: '153', out: 'Armstrong',
+  hints: ['First count the digits with a loop.', 'Then loop again, raising each digit to that power with an inner multiply loop.'],
+  steps: ['Count digits: repeat t /= 10 until 0.', 'For each digit d, compute d multiplied by itself "digits" times.', 'Add each power to sum.', 'Compare sum with the original number.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, original, digits = 0, sum = 0;
+    scanf("%d", &n);
+    original = n;
+    for (int t = n; t > 0; t /= 10)
+        digits++;
+    for (int t = n; t > 0; t /= 10) {
+        int d = t % 10, p = 1;
+        for (int i = 0; i < digits; i++)
+            p *= d;
+        sum += p;
+    }
+    printf(sum == original ? "Armstrong\n" : "Not Armstrong\n");
+    return 0;
+}
+` },
+
+{ id: 15, lvl: 2, cat: 'Arrays', title: 'Digit frequency',
+  desc: 'Read a non-negative integer. For every digit that appears, print digit:count in increasing digit order, separated by spaces.',
+  in: '112330', out: '0:1 1:2 2:1 3:2',
+  hints: ['Use an array of 10 counters, one per digit. The digit is the index.', 'cnt[n % 10]++ counts a digit. Remember n == 0 has one digit.'],
+  steps: ['Declare int cnt[10] = {0}.', 'Peel digits and do cnt[digit]++.', 'Loop d from 0 to 9 and print d:cnt[d] when cnt[d] > 0.', 'Use a flag so you do not print a leading space.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, cnt[10] = {0};
+    scanf("%d", &n);
+    if (n == 0) cnt[0] = 1;
+    while (n > 0) {
+        cnt[n % 10]++;
+        n /= 10;
+    }
+    int first = 1;
+    for (int d = 0; d < 10; d++) {
+        if (cnt[d] > 0) {
+            if (!first) printf(" ");
+            printf("%d:%d", d, cnt[d]);
+            first = 0;
+        }
+    }
+    printf("\n");
+    return 0;
+}
+` },
+
+{ id: 16, lvl: 2, cat: 'Strings', title: 'Count vowels',
+  desc: 'Read one line of text and print how many vowels (a, e, i, o, u, either case) it contains.',
+  in: 'embedded systems', out: '4',
+  hints: ['A string ends at the character \'\\0\'. Loop until you reach it.', 'Convert each character with tolower() so you only compare lowercase vowels.'],
+  steps: ['Read the line with fgets (scanf stops at spaces).', 'Loop i while s[i] != \'\\0\'.', 'Lowercase s[i] and compare with a, e, i, o, u.', 'Count the matches and print.'],
+  code: C`
+#include <stdio.h>
+#include <ctype.h>
+
+int main(void) {
+    char s[200];
+    int count = 0;
+    fgets(s, sizeof s, stdin);
+    for (int i = 0; s[i] != '\0'; i++) {
+        char c = tolower((unsigned char)s[i]);
+        if (c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u')
+            count++;
+    }
+    printf("%d\n", count);
+    return 0;
+}
+` },
+
+{ id: 17, lvl: 2, cat: 'Strings', title: 'Reverse a string',
+  desc: 'Read one word and print it reversed. Do it in place by swapping characters, without a second array.',
+  in: 'firmware', out: 'erawmrif',
+  hints: ['Use two indices, one at the start and one at the end.', 'Swap, move both inward, stop when they meet.'],
+  steps: ['Read with fgets and strip the trailing newline using strcspn.', 'i = 0, j = strlen - 1.', 'While i < j: swap s[i] and s[j], then i++ and j--.', 'Print the string.'],
+  code: C`
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char s[100];
+    fgets(s, sizeof s, stdin);
+    s[strcspn(s, "\n")] = '\0';
+    int i = 0, j = (int)strlen(s) - 1;
+    while (i < j) {
+        char t = s[i];
+        s[i] = s[j];
+        s[j] = t;
+        i++;
+        j--;
+    }
+    printf("%s\n", s);
+    return 0;
+}
+` },
+
+{ id: 18, lvl: 2, cat: 'Strings', title: 'Palindrome string',
+  desc: 'Read one word. Print Palindrome if it reads the same both ways, otherwise Not palindrome.',
+  in: 'madam', out: 'Palindrome',
+  hints: ['Compare the first character with the last, the second with the second last, and so on.', 'You only need to check up to the middle: n / 2 pairs.'],
+  steps: ['Read the word and strip the newline.', 'n = strlen(s).', 'For i from 0 to n / 2 - 1 compare s[i] with s[n - 1 - i].', 'One mismatch means not a palindrome.'],
+  code: C`
+#include <stdio.h>
+#include <string.h>
+
+int main(void) {
+    char s[100];
+    fgets(s, sizeof s, stdin);
+    s[strcspn(s, "\n")] = '\0';
+    int n = (int)strlen(s), ok = 1;
+    for (int i = 0; i < n / 2; i++) {
+        if (s[i] != s[n - 1 - i]) {
+            ok = 0;
+            break;
+        }
+    }
+    printf(ok ? "Palindrome\n" : "Not palindrome\n");
+    return 0;
+}
+` },
+
+{ id: 19, lvl: 2, cat: 'Arrays', title: 'Reverse an array',
+  desc: 'Read N, then N integers. Reverse the array in place and print it, space separated.',
+  in: '5\n1 2 3 4 5', out: '5 4 3 2 1',
+  hints: ['Same two-index idea as reversing a string.', 'Swap a[i] with a[n - 1 - i] for the first half only.'],
+  steps: ['Read n, then fill the array in a loop.', 'For i from 0 to n / 2 - 1 swap a[i] and a[n - 1 - i].', 'Print the array.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, a[100];
+    scanf("%d", &n);
+    for (int i = 0; i < n; i++)
+        scanf("%d", &a[i]);
+    for (int i = 0; i < n / 2; i++) {
+        int t = a[i];
+        a[i] = a[n - 1 - i];
+        a[n - 1 - i] = t;
+    }
+    for (int i = 0; i < n; i++)
+        printf("%d%c", a[i], i < n - 1 ? ' ' : '\n');
+    return 0;
+}
+` },
+
+{ id: 20, lvl: 2, cat: 'Arrays', title: 'Max and min of an array',
+  desc: 'Read N, then N integers. Print the largest and smallest as Max=x Min=y.',
+  in: '5\n12 7 45 3 29', out: 'Max=45 Min=3',
+  hints: ['Start both max and min at a[0], not at 0.', 'Why is starting at 0 wrong when all numbers are negative?'],
+  steps: ['Read the array.', 'Set max = min = a[0].', 'Loop from index 1 and update max or min when you find a better value.', 'Print both.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, a[100];
+    scanf("%d", &n);
+    for (int i = 0; i < n; i++)
+        scanf("%d", &a[i]);
+    int max = a[0], min = a[0];
+    for (int i = 1; i < n; i++) {
+        if (a[i] > max) max = a[i];
+        if (a[i] < min) min = a[i];
+    }
+    printf("Max=%d Min=%d\n", max, min);
+    return 0;
+}
+` },
+
+{ id: 21, lvl: 2, cat: 'Numbers', title: 'Decimal to binary',
+  desc: 'Read a non-negative integer and print its binary representation.',
+  in: '45', out: '101101',
+  hints: ['Divide by 2 again and again. The remainders are the bits.', 'The first remainder is the lowest bit, so print them in reverse order.'],
+  steps: ['Handle 0 separately (prints 0).', 'While n > 0: store n % 2 in an array, then n = n / 2.', 'Print the array from the last stored bit back to the first.', 'Trace 45: remainders 1,0,1,1,0,1 so the answer is 101101.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, bits[32], len = 0;
+    scanf("%d", &n);
+    if (n == 0) bits[len++] = 0;
+    while (n > 0) {
+        bits[len++] = n % 2;
+        n /= 2;
+    }
+    for (int i = len - 1; i >= 0; i--)
+        printf("%d", bits[i]);
+    printf("\n");
+    return 0;
+}
+` },
+
+{ id: 22, lvl: 2, cat: 'Pointers', title: 'Swap with pointers',
+  desc: 'Write a function void swap(int *x, int *y) and use it to swap two numbers read from input. Print them after the swap.',
+  in: '5 10', out: '10 5',
+  hints: ['C passes arguments by value. A function cannot change your variables unless you give it their addresses.', 'Call swap(&a, &b). Inside, use *x and *y.'],
+  steps: ['Declare the function with two int pointers.', 'Inside: t = *x, *x = *y, *y = t.', 'In main, pass &a and &b.', 'Print a and b to see the effect.'],
+  code: C`
+#include <stdio.h>
+
+void swap(int *x, int *y) {
+    int t = *x;
+    *x = *y;
+    *y = t;
+}
+
+int main(void) {
+    int a, b;
+    scanf("%d %d", &a, &b);
+    swap(&a, &b);
+    printf("%d %d\n", a, b);
+    return 0;
+}
+` },
+
+/* ---------- LEVEL 3 : HARD ---------- */
+{ id: 23, lvl: 3, cat: 'Strings', title: 'Word count',
+  desc: 'Read one line and print the number of words. Words are separated by one or more spaces.',
+  in: 'the quick  brown fox', out: '4',
+  hints: ['Do not count spaces. Count the moments a word begins.', 'Keep a flag inWord. A word begins when you see a non-space and inWord is 0.'],
+  steps: ['Read the line with fgets.', 'On a space, tab or newline set inWord = 0.', 'On any other character, if inWord is 0, set it to 1 and add one to the count.', 'Print the count.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    char s[300];
+    fgets(s, sizeof s, stdin);
+    int words = 0, inWord = 0;
+    for (int i = 0; s[i]; i++) {
+        if (s[i] == ' ' || s[i] == '\t' || s[i] == '\n') {
+            inWord = 0;
+        } else if (!inWord) {
+            inWord = 1;
+            words++;
+        }
+    }
+    printf("%d\n", words);
+    return 0;
+}
+` },
+
+{ id: 24, lvl: 3, cat: 'Strings', title: 'Anagram check',
+  desc: 'Read two lowercase words. Print Anagram if they use exactly the same letters the same number of times, otherwise Not anagram.',
+  in: 'listen\nsilent', out: 'Anagram',
+  hints: ['Count letters with an array of 26 counters. Index is c - \'a\'.', 'Add one for each letter of the first word and subtract one for each letter of the second.'],
+  steps: ['cnt[26] = {0}.', 'For each char in word 1: cnt[c - \'a\']++.', 'For each char in word 2: cnt[c - \'a\']--.', 'If every counter is 0 they are anagrams.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    char a[100], b[100];
+    int cnt[26] = {0};
+    scanf("%99s %99s", a, b);
+    for (int i = 0; a[i]; i++) cnt[a[i] - 'a']++;
+    for (int i = 0; b[i]; i++) cnt[b[i] - 'a']--;
+    int ok = 1;
+    for (int i = 0; i < 26; i++)
+        if (cnt[i] != 0) ok = 0;
+    printf(ok ? "Anagram\n" : "Not anagram\n");
+    return 0;
+}
+` },
+
+{ id: 25, lvl: 3, cat: 'Arrays', title: 'Second largest',
+  desc: 'Read N, then N integers. Print the second largest distinct value. Do it in one pass without sorting.',
+  in: '6\n10 40 25 40 8 33', out: '33',
+  hints: ['Track two variables: first and second, both starting very small (INT_MIN).', 'A new maximum pushes the old maximum down into second. A value between the two replaces second.'],
+  steps: ['first = second = INT_MIN.', 'If a[i] > first: second = first, first = a[i].', 'Else if a[i] < first and a[i] > second: second = a[i].', 'The duplicate 40 is ignored because it is neither greater nor smaller than first.'],
+  code: C`
+#include <stdio.h>
+#include <limits.h>
+
+int main(void) {
+    int n, a[100];
+    scanf("%d", &n);
+    for (int i = 0; i < n; i++)
+        scanf("%d", &a[i]);
+    int first = INT_MIN, second = INT_MIN;
+    for (int i = 0; i < n; i++) {
+        if (a[i] > first) {
+            second = first;
+            first = a[i];
+        } else if (a[i] < first && a[i] > second) {
+            second = a[i];
+        }
+    }
+    printf("%d\n", second);
+    return 0;
+}
+` },
+
+{ id: 26, lvl: 3, cat: 'Arrays', title: 'Linear search',
+  desc: 'Read N, N integers, then a key. Print Found at index i for the first match, or Not found.',
+  in: '5\n4 8 15 16 23\n15', out: 'Found at index 2',
+  hints: ['Walk the array from index 0.', 'Remember an index of -1 means "not found yet".'],
+  steps: ['idx = -1.', 'Loop over the array. On a[i] == key set idx = i and break.', 'If idx >= 0 print the index, else print Not found.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, a[100], key, idx = -1;
+    scanf("%d", &n);
+    for (int i = 0; i < n; i++)
+        scanf("%d", &a[i]);
+    scanf("%d", &key);
+    for (int i = 0; i < n; i++) {
+        if (a[i] == key) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx >= 0)
+        printf("Found at index %d\n", idx);
+    else
+        printf("Not found\n");
+    return 0;
+}
+` },
+
+{ id: 27, lvl: 3, cat: 'Arrays', title: 'Bubble sort',
+  desc: 'Read N and N integers. Sort them in ascending order with bubble sort and print the result.',
+  in: '6\n64 34 25 12 22 11', out: '11 12 22 25 34 64',
+  hints: ['Compare neighbours a[j] and a[j + 1]. Swap if they are out of order.', 'After pass 1 the largest value is at the end. Each pass can stop one element earlier.'],
+  steps: ['Outer loop i from 0 to n - 2 (passes).', 'Inner loop j from 0 to n - i - 2.', 'If a[j] > a[j + 1], swap them.', 'Print the sorted array.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, a[100];
+    scanf("%d", &n);
+    for (int i = 0; i < n; i++)
+        scanf("%d", &a[i]);
+    for (int i = 0; i < n - 1; i++) {
+        for (int j = 0; j < n - i - 1; j++) {
+            if (a[j] > a[j + 1]) {
+                int t = a[j];
+                a[j] = a[j + 1];
+                a[j + 1] = t;
+            }
+        }
+    }
+    for (int i = 0; i < n; i++)
+        printf("%d%c", a[i], i < n - 1 ? ' ' : '\n');
+    return 0;
+}
+` },
+
+{ id: 28, lvl: 3, cat: 'Arrays', title: 'Binary search',
+  desc: 'Read N sorted integers and a key. Print Found at index i or Not found. Use binary search, not a plain scan.',
+  in: '7\n2 5 8 12 16 23 38\n23', out: 'Found at index 5',
+  hints: ['Look at the middle element. It tells you which half to throw away.', 'Compute mid as lo + (hi - lo) / 2 to avoid overflow.'],
+  steps: ['lo = 0, hi = n - 1.', 'While lo <= hi: mid = lo + (hi - lo) / 2.', 'Equal: found. Smaller than key: lo = mid + 1. Larger: hi = mid - 1.', 'If the loop ends with no match, print Not found.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n, a[100], key;
+    scanf("%d", &n);
+    for (int i = 0; i < n; i++)
+        scanf("%d", &a[i]);
+    scanf("%d", &key);
+    int lo = 0, hi = n - 1, idx = -1;
+    while (lo <= hi) {
+        int mid = lo + (hi - lo) / 2;
+        if (a[mid] == key) {
+            idx = mid;
+            break;
+        } else if (a[mid] < key) {
+            lo = mid + 1;
+        } else {
+            hi = mid - 1;
+        }
+    }
+    if (idx >= 0)
+        printf("Found at index %d\n", idx);
+    else
+        printf("Not found\n");
+    return 0;
+}
+` },
+
+{ id: 29, lvl: 3, cat: 'Arrays', title: 'Rotate array left by k',
+  desc: 'Read N and K, then N integers. Rotate the array left by K positions and print it. Do it without a second array.',
+  in: '5 2\n1 2 3 4 5', out: '3 4 5 1 2',
+  hints: ['Write a helper reverse(a, i, j).', 'Reverse the first K elements, then the rest, then the whole array.'],
+  steps: ['k = k % n.', 'reverse(0, k - 1) gives 2 1 3 4 5.', 'reverse(k, n - 1) gives 2 1 5 4 3.', 'reverse(0, n - 1) gives 3 4 5 1 2.'],
+  code: C`
+#include <stdio.h>
+
+void reverse(int a[], int i, int j) {
+    while (i < j) {
+        int t = a[i];
+        a[i] = a[j];
+        a[j] = t;
+        i++;
+        j--;
+    }
+}
+
+int main(void) {
+    int n, k, a[100];
+    scanf("%d %d", &n, &k);
+    for (int i = 0; i < n; i++)
+        scanf("%d", &a[i]);
+    k %= n;
+    reverse(a, 0, k - 1);
+    reverse(a, k, n - 1);
+    reverse(a, 0, n - 1);
+    for (int i = 0; i < n; i++)
+        printf("%d%c", a[i], i < n - 1 ? ' ' : '\n');
+    return 0;
+}
+` },
+
+{ id: 30, lvl: 3, cat: 'Arrays', title: 'Matrix transpose',
+  desc: 'Read a 3 x 3 matrix and print its transpose. Rows become columns.',
+  in: '1 2 3\n4 5 6\n7 8 9', out: '1 4 7\n2 5 8\n3 6 9',
+  hints: ['A 2D array is m[row][col].', 'The transpose t[j][i] equals m[i][j]. Or just print m[j][i] with the loops swapped.'],
+  steps: ['Read into int m[3][3] with two nested loops.', 'Outer loop over columns j, inner loop over rows i.', 'Print m[i][j] for each, space separated.', 'Newline after each printed row.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int m[3][3];
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+            scanf("%d", &m[i][j]);
+    for (int j = 0; j < 3; j++) {
+        for (int i = 0; i < 3; i++)
+            printf("%d%c", m[i][j], i < 2 ? ' ' : '\n');
+    }
+    return 0;
+}
+` },
+
+{ id: 31, lvl: 3, cat: 'Functions', title: 'Fast power by recursion',
+  desc: 'Read x and n. Compute x to the power n with a recursive function that halves n each call.',
+  in: '2 10', out: '1024',
+  hints: ['Base case: anything to the power 0 is 1.', 'x^n = (x^(n/2))^2, and one extra x when n is odd.'],
+  steps: ['power(x, 0) returns 1.', 'half = power(x, n / 2).', 'If n is even return half * half.', 'If n is odd return half * half * x. Depth is only about log2(n).'],
+  code: C`
+#include <stdio.h>
+
+long long power(long long x, int n) {
+    if (n == 0) return 1;
+    long long half = power(x, n / 2);
+    if (n % 2 == 0)
+        return half * half;
+    return half * half * x;
+}
+
+int main(void) {
+    long long x;
+    int n;
+    scanf("%lld %d", &x, &n);
+    printf("%lld\n", power(x, n));
+    return 0;
+}
+` },
+
+{ id: 32, lvl: 3, cat: 'Pointers', title: 'Array sum with pointer arithmetic',
+  desc: 'Write int sum(const int *p, int n) that adds the elements using only pointer arithmetic (no a[i] indexing inside the function). Read N and N integers, print the sum.',
+  in: '5\n3 6 9 12 15', out: '45',
+  hints: ['p + i points to the i-th element. *(p + i) is its value.', 'An array name decays to a pointer to its first element when passed to a function.'],
+  steps: ['Function takes pointer and count.', 'Loop i from 0 to n - 1 adding *(p + i).', 'Return the total.', 'In main call sum(a, n).'],
+  code: C`
+#include <stdio.h>
+
+int sum(const int *p, int n) {
+    int s = 0;
+    for (int i = 0; i < n; i++)
+        s += *(p + i);
+    return s;
+}
+
+int main(void) {
+    int n, a[100];
+    scanf("%d", &n);
+    for (int i = 0; i < n; i++)
+        scanf("%d", &a[i]);
+    printf("%d\n", sum(a, n));
+    return 0;
+}
+` },
+
+{ id: 33, lvl: 3, cat: 'Bits', title: 'Power of two',
+  desc: 'Read a positive integer and print Yes if it is a power of two, otherwise No. Do it with one bitwise expression, no loop.',
+  in: '64', out: 'Yes',
+  hints: ['Write 8 and 7 in binary: 1000 and 0111.', 'A power of two has exactly one set bit. n & (n - 1) clears the lowest set bit.'],
+  steps: ['n must be greater than 0.', 'Compute n & (n - 1).', 'If the result is 0, only one bit was set.', 'Print Yes or No.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    int n;
+    scanf("%d", &n);
+    printf((n > 0 && (n & (n - 1)) == 0) ? "Yes\n" : "No\n");
+    return 0;
+}
+` },
+
+{ id: 34, lvl: 3, cat: 'Bits', title: 'Count set bits',
+  desc: 'Read a non-negative integer and print how many bits are 1 in its binary form.',
+  in: '45', out: '4',
+  hints: ['45 is 101101 in binary. Count the ones by hand first.', 'n & (n - 1) removes the lowest 1. Count how many times you can do that before n is 0.'],
+  steps: ['count = 0.', 'While n != 0: n = n & (n - 1) and count++.', 'Each iteration removes exactly one set bit.', 'Print count.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    unsigned int n;
+    int count = 0;
+    scanf("%u", &n);
+    while (n != 0) {
+        n &= (n - 1);
+        count++;
+    }
+    printf("%d\n", count);
+    return 0;
+}
+` },
+
+{ id: 35, lvl: 3, cat: 'Structs', title: 'Topper with a struct',
+  desc: 'Read N students, each as name and marks. Store them in an array of structs and print the topper as Topper: name marks.',
+  in: '3\nRavi 78\nAsha 91\nKiran 85', out: 'Topper: Asha 91',
+  hints: ['Define struct Student with a char array for the name and an int for marks.', 'Remember the index of the best student instead of copying the whole struct.'],
+  steps: ['Declare the struct and an array of it.', 'Read each with scanf("%29s %d", s[i].name, &s[i].marks).', 'best = 0, then update best when s[i].marks > s[best].marks.', 'Print s[best].'],
+  code: C`
+#include <stdio.h>
+
+struct Student {
+    char name[30];
+    int marks;
+};
+
+int main(void) {
+    int n;
+    struct Student s[50];
+    scanf("%d", &n);
+    for (int i = 0; i < n; i++)
+        scanf("%29s %d", s[i].name, &s[i].marks);
+    int best = 0;
+    for (int i = 1; i < n; i++)
+        if (s[i].marks > s[best].marks)
+            best = i;
+    printf("Topper: %s %d\n", s[best].name, s[best].marks);
+    return 0;
+}
+` },
+
+{ id: 36, lvl: 3, cat: 'Memory', title: 'Average with malloc',
+  desc: 'Read N, allocate an int array of exactly N elements with malloc, read the values, print the average with two decimals as Average=x.xx, and free the memory.',
+  in: '4\n10 20 30 45', out: 'Average=26.25',
+  hints: ['malloc(n * sizeof *a) asks for n ints. Always check for NULL.', 'Cast before dividing: (double)sum / n. Integer division would lose the decimals.'],
+  steps: ['Read n, then a = malloc(n * sizeof *a).', 'If a is NULL, return 1.', 'Read values, accumulate sum.', 'Print (double)sum / n with %.2f, then free(a).'],
+  code: C`
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void) {
+    int n;
+    scanf("%d", &n);
+    int *a = malloc(n * sizeof *a);
+    if (a == NULL) return 1;
+    long sum = 0;
+    for (int i = 0; i < n; i++) {
+        scanf("%d", &a[i]);
+        sum += a[i];
+    }
+    printf("Average=%.2f\n", (double)sum / n);
+    free(a);
+    return 0;
+}
+` },
+
+/* ---------- LEVEL 4 : BEAST ---------- */
+{ id: 37, lvl: 4, cat: 'Bits', title: 'Set, clear, toggle a bit',
+  desc: 'Read a value x and three bit positions s, c, t. Print x with bit s set, x with bit c cleared, and x with bit t toggled, as set=a clear=b toggle=c. Each result starts from the original x.',
+  in: '40 1 3 5', out: 'set=42 clear=32 toggle=8',
+  hints: ['Build a mask with 1u << position.', 'Set uses OR, clear uses AND with the inverted mask, toggle uses XOR.'],
+  steps: ['Set bit: x | (1u << s).', 'Clear bit: x & ~(1u << c).', 'Toggle bit: x ^ (1u << t).', 'Check 40 = 101000: set bit 1 gives 101010 (42), clear bit 3 gives 100000 (32), toggle bit 5 gives 001000 (8).'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    unsigned int x;
+    int s, c, t;
+    scanf("%u %d %d %d", &x, &s, &c, &t);
+    printf("set=%u clear=%u toggle=%u\n",
+           x | (1u << s),
+           x & ~(1u << c),
+           x ^ (1u << t));
+    return 0;
+}
+` },
+
+{ id: 38, lvl: 4, cat: 'Bits', title: 'Swap nibbles of a byte',
+  desc: 'Read a value 0 to 255. Swap its upper and lower 4 bits and print the result. Example: 0xA5 becomes 0x5A.',
+  in: '165', out: '90',
+  hints: ['A nibble is 4 bits. Mask the low nibble with 0x0F and the high nibble with 0xF0.', 'Shift the low nibble up by 4 and the high nibble down by 4, then OR them.'],
+  steps: ['low = (x & 0x0F) << 4.', 'high = (x & 0xF0) >> 4.', 'result = low | high.', '165 is 1010 0101, so the swap gives 0101 1010, which is 90.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    unsigned int x;
+    scanf("%u", &x);
+    x &= 0xFF;
+    unsigned int r = ((x & 0x0F) << 4) | ((x & 0xF0) >> 4);
+    printf("%u\n", r);
+    return 0;
+}
+` },
+
+{ id: 39, lvl: 4, cat: 'Bits', title: 'Reverse the bits of a byte',
+  desc: 'Read a value 0 to 255 and print the value you get when its 8 bits are mirrored. Example: 00001101 becomes 10110000.',
+  in: '13', out: '176',
+  hints: ['Build the answer one bit at a time.', 'Each step: shift the result left, OR in the lowest bit of x, then shift x right.'],
+  steps: ['r = 0.', 'Repeat 8 times: r = (r << 1) | (x & 1).', 'Then x >>= 1.', '13 is 00001101. Mirrored it is 10110000 = 176.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    unsigned int x, r = 0;
+    scanf("%u", &x);
+    for (int i = 0; i < 8; i++) {
+        r = (r << 1) | (x & 1);
+        x >>= 1;
+    }
+    printf("%u\n", r);
+    return 0;
+}
+` },
+
+{ id: 40, lvl: 4, cat: 'Memory', title: 'Reverse a linked list',
+  desc: 'Read N and N integers. Build a singly linked list with malloc, reverse it by changing the next pointers (no copying values), print it, and free every node.',
+  in: '5\n1 2 3 4 5', out: '5 4 3 2 1',
+  hints: ['Keep three pointers while walking: prev, cur, next.', 'Save cur->next before you overwrite it, otherwise you lose the rest of the list.'],
+  steps: ['Append each new node at the tail.', 'prev = NULL, cur = head.', 'Loop: next = cur->next, cur->next = prev, prev = cur, cur = next.', 'prev is the new head. Print, then free nodes one by one.'],
+  code: C`
+#include <stdio.h>
+#include <stdlib.h>
+
+struct Node {
+    int val;
+    struct Node *next;
+};
+
+int main(void) {
+    int n;
+    struct Node *head = NULL, *tail = NULL;
+    scanf("%d", &n);
+    for (int i = 0; i < n; i++) {
+        struct Node *node = malloc(sizeof *node);
+        scanf("%d", &node->val);
+        node->next = NULL;
+        if (!head) head = tail = node;
+        else { tail->next = node; tail = node; }
+    }
+    struct Node *prev = NULL, *cur = head;
+    while (cur) {
+        struct Node *next = cur->next;
+        cur->next = prev;
+        prev = cur;
+        cur = next;
+    }
+    head = prev;
+    for (struct Node *p = head; p; p = p->next)
+        printf("%d%c", p->val, p->next ? ' ' : '\n');
+    while (head) {
+        struct Node *t = head;
+        head = head->next;
+        free(t);
+    }
+    return 0;
+}
+` },
+
+{ id: 41, lvl: 4, cat: 'Embedded', title: 'Ring buffer',
+  desc: 'Firmware classic. A ring buffer holds the last 4 samples. Read N values and push each one. When the buffer is full, a push overwrites the oldest value. After all pushes, print the contents from oldest to newest.',
+  in: '6\n1 2 3 4 5 6', out: '3 4 5 6',
+  hints: ['Keep an array of 4, a head index (oldest item) and a count.', 'While not full, write at (head + count) % SIZE. When full, overwrite at head and advance head.'],
+  steps: ['SIZE = 4, head = 0, count = 0.', 'push: if count < SIZE write at (head + count) % SIZE and count++.', 'Else write at head, then head = (head + 1) % SIZE.', 'Print buf[(head + i) % SIZE] for i from 0 to count - 1.'],
+  code: C`
+#include <stdio.h>
+
+#define SIZE 4
+
+static int buf[SIZE];
+static int head = 0, count = 0;
+
+void push(int v) {
+    if (count < SIZE) {
+        buf[(head + count) % SIZE] = v;
+        count++;
+    } else {
+        buf[head] = v;
+        head = (head + 1) % SIZE;
+    }
+}
+
+int main(void) {
+    int n, v;
+    scanf("%d", &n);
+    for (int i = 0; i < n; i++) {
+        scanf("%d", &v);
+        push(v);
+    }
+    for (int i = 0; i < count; i++)
+        printf("%d%c", buf[(head + i) % SIZE], i < count - 1 ? ' ' : '\n');
+    return 0;
+}
+` },
+
+{ id: 42, lvl: 4, cat: 'Embedded', title: 'Detect endianness',
+  desc: 'Write a program that prints Little-endian or Big-endian for the machine it runs on. No input. You do this on real hardware when reading multi-byte registers.',
+  in: '', out: 'Little-endian',
+  hints: ['Store the value 1 in an unsigned int.', 'Look at the first byte of that int through an unsigned char pointer.'],
+  steps: ['unsigned int x = 1.', 'unsigned char *p = (unsigned char *)&x.', 'If *p == 1 the low byte is stored first, so Little-endian.', 'Otherwise Big-endian. ESP32, STM32 and AVR are all little-endian.'],
+  code: C`
+#include <stdio.h>
+
+int main(void) {
+    unsigned int x = 1;
+    unsigned char *p = (unsigned char *)&x;
+    printf(*p == 1 ? "Little-endian\n" : "Big-endian\n");
+    return 0;
+}
+` }
+];
+
+/* ======================= PREDICT THE OUTPUT ======================= */
+const prog = (q) => {
+  const inc = '#include <stdio.h>\n' + (q.inc ? q.inc + '\n' : '');
+  const body = q.body.split('\n').map(l => '    ' + l).join('\n');
+  return inc + '\n' + (q.top ? q.top + '\n' : '') + 'int main(void) {\n' + body + '\n    return 0;\n}\n';
+};
+
+const QUIZ_RAW = [
+{ id: 1, body: 'printf("%d", 7 / 2);', opts: ['3.5', '3', '4', 'Compile error'], ans: 1,
+  why: 'Both operands are int, so C does integer division and drops the fraction. Write 7 / 2.0 if you want 3.5.' },
+{ id: 2, body: 'int a = 10;\nif (a = 5)\n    printf("A");\nelse\n    printf("B");', opts: ['A', 'B', 'Compile error', 'Nothing prints'], ans: 0,
+  why: 'a = 5 is an assignment, not a comparison. It stores 5 and the value 5 is non-zero, so the condition is true. You wanted ==.' },
+{ id: 3, body: 'unsigned char c = 255;\nc++;\nprintf("%d", c);', opts: ['256', '0', '-1', '255'], ans: 1,
+  why: 'An unsigned char holds 0 to 255. Adding 1 wraps around to 0. Counters in firmware wrap like this all the time.' },
+{ id: 4, body: 'int arr[] = {1, 2, 3, 4};\nprintf("%zu", sizeof(arr) / sizeof(arr[0]));', opts: ['1', '4', '16', '8'], ans: 1,
+  why: 'sizeof(arr) is the whole array in bytes (16 on a typical PC). Dividing by the size of one element gives the element count. This only works on a real array, not on a pointer.' },
+{ id: 5, body: 'int i;\nfor (i = 0; i < 5; i++);\nprintf("%d", i);', opts: ['4', '0', '5', 'Prints 0 to 4'], ans: 2,
+  why: 'The semicolon after the for is an empty loop body. The loop runs five times doing nothing, i ends at 5, then printf runs once.' },
+{ id: 6, body: 'printf("%d %d %d", 5 & 3, 5 | 3, 5 ^ 3);', opts: ['1 7 6', '3 7 2', '1 5 4', '15 8 2'], ans: 0,
+  why: '5 is 101 and 3 is 011. AND gives 001 (1), OR gives 111 (7), XOR gives 110 (6).' },
+{ id: 7, body: 'int a = 3;\nint *p = &a;\n*p = *p + 2;\nprintf("%d", a);', opts: ['3', '5', 'The address of a', 'Compile error'], ans: 1,
+  why: 'p points at a, so *p is a itself. Writing through *p changes a to 5.' },
+{ id: 8, inc: '#include <string.h>', body: 'char s[] = "hello";\nprintf("%zu %zu", sizeof(s), strlen(s));', opts: ['5 5', '6 6', '6 5', '5 6'], ans: 2,
+  why: 'The array holds h e l l o plus the hidden terminating \\0, so sizeof is 6. strlen counts characters before the \\0, so 5.' },
+{ id: 9, body: 'int x = 2;\nswitch (x) {\n    case 1: printf("A");\n    case 2: printf("B");\n    case 3: printf("C"); break;\n    default: printf("D");\n}', opts: ['B', 'BC', 'BCD', 'ABC'], ans: 1,
+  why: 'Without break, execution falls through into the next case. It enters at case 2, prints B, falls into case 3, prints C, then hits break.' },
+{ id: 10, top: 'void f(void) {\n    static int c = 0;\n    c++;\n    printf("%d ", c);\n}\n', body: 'f();\nf();\nf();', opts: ['1 1 1', '1 2 3', '0 1 2', '3 3 3'], ans: 1,
+  why: 'A static local is created once and keeps its value between calls. A normal local would restart at 0 every call and print 1 1 1.' },
+{ id: 11, body: 'printf("%d", (1 << 3) | 1);', opts: ['8', '9', '4', '11'], ans: 1,
+  why: '1 << 3 is 1000 binary (8). OR with 1 sets the lowest bit, giving 1001, which is 9.' },
+{ id: 12, body: 'int a[5] = {1, 2, 3};\nprintf("%d %d", a[2], a[4]);', opts: ['3 0', '3 garbage', '3 5', 'Compile error'], ans: 0,
+  why: 'If you give some initialisers, every remaining element is set to zero. Without any initialiser a local array would hold garbage.' },
+{ id: 13, body: 'int a[] = {10, 20, 30};\nint *p = a;\np++;\nprintf("%d", *p + *(p + 1));', opts: ['30', '40', '50', '60'], ans: 2,
+  why: 'p++ moves the pointer by one int, so p points at 20. *(p + 1) is 30. 20 + 30 = 50.' },
+{ id: 14, body: 'int i = 0;\nwhile (i++ < 3)\n    printf("%d", i);', opts: ['012', '123', '0123', '1234'], ans: 1,
+  why: 'i++ compares the old value then increments. First test 0 < 3 is true and i becomes 1, so 1 prints. The last true test is 2 < 3 which prints 3. Then 3 < 3 fails.' },
+{ id: 15, body: 'printf("%d", -7 % 3);', opts: ['2', '-1', '1', '-2'], ans: 1,
+  why: 'Since C99 the result of % takes the sign of the left operand. -7 = (-2 * 3) + (-1).' },
+{ id: 16, body: 'if (0.1 + 0.2 == 0.3)\n    printf("Equal");\nelse\n    printf("Not equal");', opts: ['Equal', 'Not equal', 'Compile error', 'Undefined behaviour'], ans: 1,
+  why: '0.1 and 0.2 cannot be stored exactly in binary floating point. Their sum is slightly different from 0.3. Compare floats with a small tolerance instead.' },
+{ id: 17, body: 'char *p = "abc";\nprintf("%c", *(p + 1));', opts: ['a', 'b', 'c', 'abc'], ans: 1,
+  why: 'p points at the first character. p + 1 points at the second, which is b.' },
+{ id: 18, top: '#define SQ(x) x * x\n', body: 'printf("%d", SQ(2 + 3));', opts: ['25', '11', '10', 'Compile error'], ans: 1,
+  why: 'A macro is plain text replacement. SQ(2 + 3) becomes 2 + 3 * 2 + 3, and multiplication goes first: 2 + 6 + 3 = 11. Write (x) * (x) in the macro.' },
+{ id: 19, body: 'int a = 17, b = 5;\nprintf("%d", a / b * b + a % b);', opts: ['15', '17', '20', '3'], ans: 1,
+  why: '17 / 5 = 3, times 5 = 15, plus 17 % 5 = 2 gives 17. Quotient times divisor plus remainder always rebuilds the original number.' },
+{ id: 20, body: 'printf("%d", !0 + !5);', opts: ['0', '1', '2', '6'], ans: 1,
+  why: '! turns zero into 1 and any non-zero value into 0. So !0 is 1, !5 is 0, and the sum is 1.' },
+{ id: 21, body: 'int x = 5;\nint y = x++ * 2;\nprintf("%d %d", x, y);', opts: ['5 10', '6 10', '6 12', '5 12'], ans: 1,
+  why: 'Post-increment uses the old value (5) in the expression, so y = 10, and only then x becomes 6.' },
+{ id: 22, body: 'printf("%d", sizeof(int) > -1);', opts: ['1', '0', 'Compile error', 'Depends on the compiler'], ans: 1,
+  why: 'sizeof returns an unsigned type. The -1 is converted to unsigned and becomes a huge number, so 4 > huge is false. Mixing signed and unsigned in comparisons is a classic bug.' },
+{ id: 23, body: 'printf("%d", 10 > 5 > 2);', opts: ['1', '0', 'Compile error', '2'], ans: 1,
+  why: 'Comparisons evaluate left to right. 10 > 5 is 1, then 1 > 2 is 0. C has no chained comparison like maths does.' }
+];
+const QUIZ = QUIZ_RAW.map(q => Object.assign({}, q, { code: prog(q) }));
+
+</script>
+<script>
+(function () {
+'use strict';
+
+/* ---------- helpers ---------- */
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const pad2 = n => String(n).padStart(2, '0');
+const keyOf = d => d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+const todayKey = () => keyOf(new Date());
+const byId = id => PROBLEMS.find(p => p.id === id);
+const fmtMs = ms => { const s = Math.floor(ms / 1000); return pad2(Math.floor(s / 60)) + ':' + pad2(s % 60); };
+
+const LV = [null,
+  { name: 'Warm-up', xp: 10 }, { name: 'Core', xp: 20 }, { name: 'Hard', xp: 35 }, { name: 'Beast', xp: 60 }];
+const MULT = { alone: 1, hint: 0.6, peek: 0.25 };
+const MODE_ORDER = { peek: 1, hint: 2, alone: 3 };
+const MODE_TXT = { alone: 'On my own', hint: 'With hints', peek: 'Studied the solution' };
+const xpFor = (lvl, mode) => Math.round(LV[lvl].xp * MULT[mode]);
+const RANKS = [
+  { n: 'Rookie', xp: 0 }, { n: 'Coder', xp: 150 }, { n: 'Debugger', xp: 400 },
+  { n: 'Firmware Dev', xp: 800 }, { n: 'Pointer Slayer', xp: 1500 }, { n: 'Beast', xp: 3000 }
+];
+const CATS = Array.from(new Set(PROBLEMS.map(p => p.cat))).sort();
+const CHECK = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5l3.2 3.2L13 4.8"/></svg>';
+
+/* ---------- C syntax colouring ---------- */
+const HL_RE = /(\/\*[\s\S]*?\*\/|\/\/[^\n]*)|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')|(^[ \t]*#[ \t]*\w+[^\n]*)|\b(0x[0-9a-fA-F]+|\d+(?:\.\d+)?)\b|\b(int|char|float|double|void|long|short|unsigned|signed|struct|typedef|const|static|return|if|else|for|while|do|switch|case|break|continue|default|sizeof|enum|union|NULL)\b/gm;
+function hl(code) {
+  let out = '', last = 0, m;
+  HL_RE.lastIndex = 0;
+  while ((m = HL_RE.exec(code))) {
+    out += esc(code.slice(last, m.index));
+    const cls = m[1] ? 'c' : m[2] ? 's' : m[3] ? 'p' : m[4] ? 'n' : 'k';
+    out += '<span class="' + cls + '">' + esc(m[0]) + '</span>';
+    last = HL_RE.lastIndex;
+  }
+  return out + esc(code.slice(last));
+}
+
+/* ---------- state ---------- */
+const LS = 'cbeast.v1';
+const blank = () => ({ v: 1, xp: 0, updatedAt: 0, days: {}, probs: {}, quiz: {}, rounds: 0 });
+function normalize(o) {
+  const b = blank();
+  if (!o || typeof o !== 'object') return b;
+  b.xp = +o.xp || 0; b.updatedAt = +o.updatedAt || 0; b.rounds = +o.rounds || 0;
+  if (o.days && typeof o.days === 'object') b.days = o.days;
+  if (o.probs && typeof o.probs === 'object') b.probs = o.probs;
+  if (o.quiz && typeof o.quiz === 'object') b.quiz = o.quiz;
+  return b;
+}
+function loadLocal() { try { return normalize(JSON.parse(localStorage.getItem(LS))); } catch (e) { return blank(); } }
+let S = loadLocal();
+const ui = { tab: 'today', pid: null, rev: {}, t0: 0, timer: null, round: null, f: { lv: 0, cat: 'all', st: 'all', q: '' }, sync: 'local', result: null };
+
+/* ---------- sync (db) ---------- */
+let dbh = null, uid = null, pushTimer = null, pushing = false, pushAgain = false;
+const progPath = () => 'data/users/' + uid + '/progress';
+function setSync(s) { ui.sync = s; const el = $('#syncline'); if (el) el.textContent = syncText(); }
+function syncText() {
+  return ui.sync === 'ok' ? 'Progress is saved to your account and follows you across devices.'
+    : ui.sync === 'wait' ? 'Saving to your account...'
+    : ui.sync === 'err' ? 'Could not reach your account. Progress is still saved on this device.'
+    : 'Progress is saved on this device only. Use the backup box below to move it.';
+}
+function pruneDays() {
+  const keys = Object.keys(S.days).sort();
+  keys.slice(0, Math.max(0, keys.length - 60)).forEach(k => { delete S.days[k].mission; delete S.days[k].solved; });
+}
+function save() {
+  S.updatedAt = Date.now();
+  pruneDays();
+  try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) { /* storage blocked */ }
+  if (dbh && uid) { setSync('wait'); clearTimeout(pushTimer); pushTimer = setTimeout(push, 1200); }
+}
+async function push() {
+  if (!dbh || !uid) return;
+  if (pushing) { pushAgain = true; return; }
+  pushing = true;
+  try { await dbh.doc(progPath()).set(JSON.parse(JSON.stringify(S))); setSync('ok'); }
+  catch (e) { setSync('err'); }
+  pushing = false;
+  if (pushAgain) { pushAgain = false; push(); }
+}
+async function initRemote() {
+  try {
+    if (!window.claude || !claude.use) return;
+    const [d, u] = await Promise.all([claude.use('db'), claude.use('user')]);
+    if (!d || !u) return;
+    const id = await u.id();
+    if (!id) return;
+    dbh = d; uid = id;
+    const snap = await dbh.doc(progPath()).get();
+    if (snap.exists) {
+      const r = normalize(snap.data());
+      if (r.updatedAt > S.updatedAt) {
+        S = r;
+        try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) { /* ignore */ }
+        if (!ui.pid) render();
+        renderHeader();
+        setSync('ok');
+      } else if (S.updatedAt > r.updatedAt) { setSync('wait'); push(); }
+      else setSync('ok');
+    } else if (S.updatedAt) { setSync('wait'); push(); }
+    else setSync('ok');
+  } catch (e) { dbh = null; setSync('local'); }
+}
+
+/* code notes: local first, db in the background */
+let codeTimer = null, codePending = {};
+const codeKey = id => 'cbeast.code.' + id;
+function starterFor(p) {
+  return '/* ' + p.title + ' */\n#include <stdio.h>\n\nint main(void) {\n    // write your solution here\n\n    return 0;\n}\n';
+}
+function readLocalCode(id) { try { return localStorage.getItem(codeKey(id)); } catch (e) { return null; } }
+function writeCode(id, text) {
+  try { localStorage.setItem(codeKey(id), text); localStorage.setItem(codeKey(id) + '.u', String(Date.now())); } catch (e) { /* ignore */ }
+  codePending[id] = text;
+  if (dbh && uid) { clearTimeout(codeTimer); codeTimer = setTimeout(flushCode, 1500); }
+}
+async function flushCode() {
+  const items = Object.entries(codePending); codePending = {};
+  for (const [id, t] of items) {
+    try { await dbh.doc('data/users/' + uid + '/code-' + id).set({ t: t.slice(0, 20000), u: Date.now() }); } catch (e) { /* retry on next edit */ }
+  }
+}
+async function remoteCode(id) {
+  if (!dbh || !uid) return null;
+  try { const s = await dbh.doc('data/users/' + uid + '/code-' + id).get(); return s.exists ? s.data() : null; } catch (e) { return null; }
+}
+
+/* ---------- derived ---------- */
+function dayRec(k) { k = k || todayKey(); if (!S.days[k]) S.days[k] = { a: 0, xp: 0 }; return S.days[k]; }
+function award(n, count) {
+  const d = dayRec();
+  S.xp += n; d.xp = (d.xp || 0) + n;
+  if (count !== false) d.a = (d.a || 0) + 1;
+}
+function streakInfo() {
+  const keys = Object.keys(S.days).filter(k => S.days[k].a > 0).sort();
+  const set = new Set(keys);
+  let cur = 0; const d = new Date();
+  if (!set.has(keyOf(d))) d.setDate(d.getDate() - 1);
+  while (set.has(keyOf(d))) { cur++; d.setDate(d.getDate() - 1); }
+  let best = 0, run = 0, prev = null;
+  keys.forEach(k => {
+    const dt = new Date(k + 'T00:00:00');
+    run = prev && Math.round((dt - prev) / 864e5) === 1 ? run + 1 : 1;
+    best = Math.max(best, run); prev = dt;
+  });
+  return { cur, best, today: set.has(todayKey()) };
+}
+function rankInfo(xp) {
+  let i = 0;
+  RANKS.forEach((r, k) => { if (xp >= r.xp) i = k; });
+  const next = RANKS[i + 1];
+  const frac = next ? (xp - RANKS[i].xp) / (next.xp - RANKS[i].xp) : 1;
+  return { i, next, frac, rank: RANKS[i] };
+}
+const best = id => (S.probs[id] && S.probs[id].best) || null;
+const aloneCount = () => PROBLEMS.filter(p => best(p.id) === 'alone').length;
+const tier = () => Math.min(4, 1 + Math.floor(aloneCount() / 8));
+
+/* ---------- daily mission ---------- */
+function mulberry(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+function ensureMission() {
+  const d = dayRec();
+  if (d.mission && d.mission.length) return d.mission;
+  const rng = mulberry(hashStr(todayKey()));
+  const t = tier(), used = new Set(), out = [];
+  const pick = pool => { pool = pool.filter(p => !used.has(p.id)); if (!pool.length) return null; return pool[Math.floor(rng() * pool.length)]; };
+  const take = (slot, pools) => {
+    for (const pool of pools) { const p = pick(pool); if (p) { used.add(p.id); out.push({ id: p.id, slot }); return; } }
+  };
+  const notAlone = p => best(p.id) !== 'alone';
+  const review = PROBLEMS.filter(p => (best(p.id) === 'peek' || best(p.id) === 'hint') && p.lvl <= t);
+  take(review.length ? 'Review' : 'Warm-up', [
+    review,
+    PROBLEMS.filter(p => notAlone(p) && p.lvl <= Math.max(1, t - 1)),
+    PROBLEMS.filter(p => p.lvl <= t)
+  ]);
+  take('Core', [PROBLEMS.filter(p => notAlone(p) && p.lvl === t), PROBLEMS.filter(p => notAlone(p) && p.lvl <= t), PROBLEMS.filter(p => p.lvl === t)]);
+  take('Stretch', [PROBLEMS.filter(p => notAlone(p) && p.lvl === Math.min(4, t + 1)), PROBLEMS.filter(notAlone), PROBLEMS]);
+  d.mission = out;
+  save();
+  return out;
+}
+
+/* ---------- header ---------- */
+function renderHeader() {
+  const st = streakInfo(), ri = rankInfo(S.xp);
+  const nodes = RANKS.map((r, k) => '<div class="node' + (k <= ri.i ? ' reached' : '') + (k === ri.i ? ' now' : '') + '"><i></i><span>' + esc(r.n) + '</span></div>').join('');
+  const p = Math.min(1, (ri.i + (ri.next ? ri.frac : 0)) / (RANKS.length - 1));
+  $('#hdr').innerHTML =
+    '<div class="top"><h1 class="brand">C Beast Mode<small>Daily C and logic reps. Small and steady beats big and rare.</small></h1>' +
+    '<div class="chips">' +
+    '<div class="chip' + (st.today ? ' on' : '') + '"><b>' + st.cur + '</b><span>day streak</span></div>' +
+    '<div class="chip"><b>' + S.xp + '</b><span>XP</span></div>' +
+    '<div class="chip"><b>' + aloneCount() + '/' + PROBLEMS.length + '</b><span>solved alone</span></div></div></div>' +
+    '<div><div class="trace" style="--p:' + p.toFixed(3) + '"><div class="fill"></div>' + nodes + '</div>' +
+    '<p class="next-up">' + (ri.next ? (ri.next.xp - S.xp) + ' XP to ' + esc(ri.next.n) + '.' : 'Top rank reached. Keep the streak alive.') + '</p></div>';
+}
+function renderTabs() {
+  const T = [['today', 'Today'], ['problems', 'Problems'], ['predict', 'Predict'], ['progress', 'Progress']];
+  $('#tabs').innerHTML = T.map(t => '<button class="tab" role="tab" data-act="tab" data-t="' + t[0] + '" aria-selected="' + (ui.tab === t[0]) + '">' + t[1] + '</button>').join('');
+  $('#tabs').hidden = !!ui.pid;
+}
+
+/* ---------- views ---------- */
+function statusPad(id) { const b = best(id); return '<span class="pad" data-s="' + (b || '') + '">' + (b ? CHECK : '') + '</span>'; }
+function pips(l) { return '<span class="pips" title="Level ' + l + '">' + [1, 2, 3, 4].map(k => '<i' + (k <= l ? ' class="on"' : '') + '></i>').join('') + '</span>'; }
+
+function viewToday() {
+  const m = ensureMission(), d = dayRec(), solved = d.solved || [];
+  const doneN = m.filter(x => solved.includes(x.id)).length;
+  const st = streakInfo();
+  let lead;
+  if (doneN === m.length) lead = 'Mission complete. Come back tomorrow to keep the streak.';
+  else if (st.cur === 0) lead = 'Start with the first card. Ten focused minutes counts as a day.';
+  else lead = 'Do them in order. Easy first builds the confidence for the hard one.';
+  const cards = m.map(x => {
+    const p = byId(x.id), done = solved.includes(x.id);
+    return '<button class="mc" data-act="open" data-id="' + p.id + '">' + statusPad(p.id) +
+      '<span><span class="slot">' + esc(x.slot) + '</span><br><span class="t">' + esc(p.title) + '</span><br>' +
+      '<span class="m">' + pips(p.lvl) + '<span>' + LV[p.lvl].name + '</span><span>' + esc(p.cat) + '</span>' +
+      (done ? '<span class="pill ' + (best(p.id) || '') + '">Done today</span>' : '') + '</span></span>' +
+      '<span class="xp">' + LV[p.lvl].xp + '<small>max XP</small></span></button>';
+  }).join('');
+  const qSeen = Object.keys(S.quiz).length;
+  return '<div class="view">' +
+    '<div><h2 class="sec-h">' + new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' }) + '</h2><p class="sub">' + lead + '</p></div>' +
+    '<div class="mission">' + cards + '</div>' +
+    '<p class="sub">' + doneN + ' of ' + m.length + ' done. Finish all three for a +25 XP bonus' + (d.bonus ? ' (earned).' : '.') + '</p>' +
+    '<div class="card row" style="justify-content:space-between"><div><div class="sec-h" style="font-size:19px">Predict the output</div>' +
+    '<p class="sub">Five short questions. Reading code correctly is half of logic building.' + (qSeen ? ' You have seen ' + qSeen + ' of ' + QUIZ.length + '.' : '') + '</p></div>' +
+    '<button class="btn primary" data-act="round">Start a round</button></div>' +
+    '<div class="card"><div class="sec-h" style="font-size:19px;margin-bottom:8px">The method, every time</div><ol class="method">' +
+    '<li>Read the problem twice. Say it in your own words.</li>' +
+    '<li>Solve the sample on paper. Write down each variable as it changes.</li>' +
+    '<li>Write the steps in plain English, then turn each step into C.</li>' +
+    '<li>Run it, then try to break it with 0, a negative number, one element.</li></ol></div></div>';
+}
+
+function viewProblems() {
+  const f = ui.f;
+  const list = PROBLEMS.filter(p =>
+    (!f.lv || p.lvl === f.lv) && (f.cat === 'all' || p.cat === f.cat) &&
+    (f.st === 'all' || (f.st === 'new' ? !best(p.id) : f.st === 'review' ? (best(p.id) === 'peek' || best(p.id) === 'hint') : best(p.id) === 'alone')) &&
+    (!f.q || (p.title + ' ' + p.cat).toLowerCase().includes(f.q.toLowerCase())));
+  const lvBtns = [0, 1, 2, 3, 4].map(l => '<button class="fc" data-act="flv" data-l="' + l + '" aria-pressed="' + (f.lv === l) + '">' + (l ? 'L' + l + ' ' + LV[l].name : 'All levels') + '</button>').join('');
+  const rows = list.map(p =>
+    '<button class="pr" data-act="open" data-id="' + p.id + '"><span class="num">#' + pad2(p.id) + '</span>' +
+    '<span><span class="t">' + esc(p.title) + '</span><br><span class="m">' + esc(p.cat) + ' · ' + LV[p.lvl].name + '</span></span>' +
+    '<span>' + (best(p.id) ? '<span class="pill ' + best(p.id) + '">' + MODE_TXT[best(p.id)] + '</span>' : '<span class="pill">New</span>') + '</span></button>').join('');
+  return '<div class="view"><div class="chipset" id="lvset">' + lvBtns + '</div>' +
+    '<div class="filters"><select id="fcat" aria-label="Topic"><option value="all">All topics</option>' + CATS.map(c => '<option' + (f.cat === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select>' +
+    '<select id="fst" aria-label="Status"><option value="all">Any status</option><option value="new"' + (f.st === 'new' ? ' selected' : '') + '>Not tried</option><option value="review"' + (f.st === 'review' ? ' selected' : '') + '>Needs review</option><option value="alone"' + (f.st === 'alone' ? ' selected' : '') + '>Solved alone</option></select>' +
+    '<input id="fq" type="search" placeholder="Search problems" aria-label="Search problems" value="' + esc(f.q) + '"></div>' +
+    '<p class="sub">' + list.length + ' of ' + PROBLEMS.length + ' problems</p>' +
+    '<div class="plist" id="plist">' + (rows || '<div class="empty">Nothing matches. Clear a filter.</div>') + '</div></div>';
+}
+
+/* problem detail */
+function capText() {
+  const p = byId(ui.pid), r = ui.rev;
+  const mode = r.steps || r.sol ? 'peek' : (r.h1 || r.h2 ? 'hint' : 'alone');
+  return 'XP available now: ' + xpFor(p.lvl, mode) + ' of ' + LV[p.lvl].xp + (mode === 'alone' ? '' : ' (' + MODE_TXT[mode].toLowerCase() + ')');
+}
+function viewProblem() {
+  const p = byId(ui.pid);
+  return '<div class="view prob">' +
+    '<button class="btn sm back" data-act="back">&larr; Back</button>' +
+    '<div><div class="meta">' + pips(p.lvl) + '<span>Level ' + p.lvl + ' · ' + LV[p.lvl].name + '</span><span>' + esc(p.cat) + '</span><span>#' + pad2(p.id) + '</span>' +
+    (best(p.id) ? '<span class="pill ' + best(p.id) + '">Best: ' + MODE_TXT[best(p.id)] + '</span>' : '') + '</div>' +
+    '<h2>' + esc(p.title) + '</h2><p>' + esc(p.desc) + '</p></div>' +
+    '<div class="io"><div><div class="lbl">Sample input</div><pre class="io" id="sin">' + (p.in ? esc(p.in) : '(no input)') + '</pre></div>' +
+    '<div><div class="lbl">Expected output</div><pre class="io">' + esc(p.out) + '</pre></div></div>' +
+    '<div class="timer">Time on this problem <span id="tm">00:00</span></div>' +
+    '<section><div class="lbl">Your code</div><textarea id="code" class="editor" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" aria-label="Your C code"></textarea>' +
+    '<div class="row" style="margin-top:8px"><button class="btn sm" data-act="copycode">Copy code</button>' +
+    '<button class="btn sm" data-act="copyin">Copy sample input</button>' +
+    '<button class="btn sm" data-act="resetcode">Reset</button>' +
+    '<a class="btn sm" href="https://www.onlinegdb.com/online_c_compiler" target="_blank" rel="noopener">Open an online C compiler</a></div>' +
+    '<p class="note" style="margin-top:6px">Paste your code in the compiler, add the sample input in its input box, run it, compare with the expected output. Tab indents here. Press Esc then Tab to leave the box.</p></section>' +
+    '<section class="card help"><div class="sec-h" style="font-size:19px;margin-bottom:4px">Stuck? One step at a time</div><p class="cap" id="cap">' + capText() + '</p>' +
+    '<div class="btns" style="margin-top:10px">' +
+    '<button class="btn" data-act="reveal" data-k="h1">Hint 1</button><button class="btn" data-act="reveal" data-k="h2">Hint 2</button>' +
+    '<button class="btn" data-act="reveal" data-k="steps">Logic steps</button><button class="btn" data-act="reveal" data-k="sol">Full solution</button></div>' +
+    '<div id="rv"></div></section>' +
+    '<section class="card fin"><div class="sec-h" style="font-size:19px;margin-bottom:4px">How did it go?</div>' +
+    '<p class="cap">Be honest. The score is only for you, and honest reps are what build real confidence.</p>' +
+    '<div class="btns" style="margin-top:10px"><button class="btn primary" data-act="done" data-m="alone">Solved it on my own</button>' +
+    '<button class="btn" data-act="done" data-m="hint">Solved it with hints</button>' +
+    '<button class="btn" data-act="done" data-m="peek">I studied the solution</button></div>' +
+    '<div id="result" style="margin-top:12px"></div></section></div>';
+}
+function revealHtml(k) {
+  const p = byId(ui.pid);
+  if (k === 'h1') return '<div class="reveal" id="rv-h1"><div class="lbl">Hint 1</div><p>' + esc(p.hints[0]) + '</p></div>';
+  if (k === 'h2') return '<div class="reveal" id="rv-h2"><div class="lbl">Hint 2</div><p>' + esc(p.hints[1]) + '</p></div>';
+  if (k === 'steps') return '<div class="reveal" id="rv-steps"><div class="lbl">Logic steps</div><ol>' + p.steps.map(s => '<li>' + esc(s) + '</li>').join('') + '</ol></div>';
+  return '<div class="reveal" id="rv-sol"><div class="lbl">Solution</div><pre class="code">' + hl(p.code) + '</pre>' +
+    '<div class="row"><button class="btn sm" data-act="copysol">Copy solution</button></div>' +
+    '<p class="note">Do not just read it. Close it and type it again from memory, then change one thing and predict what happens.</p></div>';
+}
+
+/* predict */
+function pickRound() {
+  const scored = QUIZ.map(q => {
+    const r = S.quiz[q.id];
+    const sc = !r ? 2 : (r.l === 0 ? 3 : 1);
+    return { id: q.id, s: sc + Math.random() };
+  }).sort((a, b) => b.s - a.s).slice(0, 5).map(x => x.id);
+  return scored.sort(() => Math.random() - 0.5);
+}
+function viewPredict() {
+  const R = ui.round;
+  if (!R) {
+    const seen = Object.keys(S.quiz).length, right = Object.values(S.quiz).filter(r => r.l === 1).length;
+    return '<div class="view"><div><h2 class="sec-h">Predict the output</h2><p class="sub">Read the code. Decide what it prints before you tap. Wrong answers come back more often until you get them right.</p></div>' +
+      '<div class="card row" style="justify-content:space-between"><div><b>' + seen + ' of ' + QUIZ.length + '</b> questions seen<br><span class="sub">' + right + ' answered correctly last time</span></div>' +
+      '<button class="btn primary" data-act="round">Start a round of 5</button></div></div>';
+  }
+  if (R.done) {
+    return '<div class="view"><div class="result"><div class="sec-h">Round complete</div><p><b>' + R.score + ' of ' + R.ids.length + '</b> correct. +' + R.xp + ' XP.</p>' +
+      '<p class="sub">' + (R.score === R.ids.length ? 'Clean round.' : 'Missed ones will come back in the next round. That is how they stick.') + '</p>' +
+      '<div class="row"><button class="btn primary" data-act="round">Another round</button><button class="btn" data-act="endround">Done for now</button></div></div></div>';
+  }
+  const q = QUIZ.find(x => x.id === R.ids[R.i]);
+  const opts = q.opts.map((o, i) => {
+    let c = 'opt';
+    if (R.picked !== null) { if (i === q.ans) c += ' right'; else if (i === R.picked) c += ' wrong'; }
+    return '<button class="' + c + '" data-act="pick" data-i="' + i + '"' + (R.picked !== null ? ' disabled' : '') + '>' + esc(o) + '</button>';
+  }).join('');
+  let why = '';
+  if (R.picked !== null) {
+    why = '<div class="why"><p><b>' + (R.picked === q.ans ? 'Correct.' : 'Not quite. The answer is ' + esc(q.opts[q.ans]) + '.') + '</b> ' + esc(q.why) + '</p>' +
+      '<div class="row"><button class="btn primary" data-act="next">' + (R.i + 1 >= R.ids.length ? 'Finish round' : 'Next question') + '</button></div></div>';
+  }
+  return '<div class="view"><div class="row" style="justify-content:space-between"><span class="sec-h" style="font-size:19px">Question ' + (R.i + 1) + ' of ' + R.ids.length + '</span><span class="sub">' + R.score + ' correct</span></div>' +
+    '<div class="bar"><i style="width:' + Math.round(R.i / R.ids.length * 100) + '%"></i></div>' +
+    '<pre class="code">' + hl(q.code) + '</pre><p><b>What does this print?</b></p><div class="opts">' + opts + '</div>' + why + '</div>';
+}
+
+/* progress */
+function viewProgress() {
+  const st = streakInfo();
+  const attempted = PROBLEMS.filter(p => best(p.id));
+  const aloneN = aloneCount();
+  const pct = attempted.length ? Math.round(aloneN / attempted.length * 100) : 0;
+  const qs = Object.values(S.quiz), qSeen = qs.length, qRight = qs.filter(r => r.l === 1).length;
+  const days = Object.keys(S.days).filter(k => S.days[k].a > 0).length;
+  // heatmap
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  const dow = (now.getDay() + 6) % 7;
+  const start = new Date(now); start.setDate(now.getDate() - dow - 11 * 7);
+  let cells = '';
+  for (let i = 0; i < 84; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    if (d > now) { cells += '<i data-l="x"></i>'; continue; }
+    const r = S.days[keyOf(d)]; const x = r ? r.xp || 0 : 0, a = r ? r.a || 0 : 0;
+    const l = !a ? 0 : x < 30 ? 1 : x < 80 ? 2 : 3;
+    cells += '<i data-l="' + l + '" title="' + d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) + ': ' + a + ' reps, ' + x + ' XP"></i>';
+  }
+  const lvRows = [1, 2, 3, 4].map(l => {
+    const ps = PROBLEMS.filter(p => p.lvl === l);
+    const n = ps.filter(p => best(p.id) === 'alone').length;
+    return '<div class="lvrow"><div class="nm"><b>L' + l + ' ' + LV[l].name + '</b><br><span class="sub">' + n + ' of ' + ps.length + ' alone</span></div><div class="segs">' +
+      ps.map(p => '<i data-s="' + (best(p.id) || '') + '" title="#' + p.id + ' ' + esc(p.title) + '"></i>').join('') + '</div></div>';
+  }).join('');
+  const rq = PROBLEMS.filter(p => best(p.id) === 'peek' || best(p.id) === 'hint').sort((a, b) => a.lvl - b.lvl);
+  const rqHtml = rq.length ? '<div class="plist">' + rq.map(p => '<button class="pr" data-act="open" data-id="' + p.id + '"><span class="num">#' + pad2(p.id) + '</span><span><span class="t">' + esc(p.title) + '</span><br><span class="m">' + LV[p.lvl].name + ' · ' + esc(p.cat) + '</span></span><span class="pill ' + best(p.id) + '">' + MODE_TXT[best(p.id)] + '</span></button>').join('') + '</div>'
+    : '<p class="sub">Nothing to review. Problems you solve with hints or by studying the solution land here so you can redo them.</p>';
+  let msg = 'Solve a problem on your own to start the score.';
+  if (attempted.length) msg = 'You solved ' + aloneN + ' of ' + attempted.length + ' attempted problems without any help. That number is your real confidence. Push it up.';
+  return '<div class="view">' +
+    '<div class="stats"><div class="card stat"><b>' + st.cur + '</b><span>current streak (days)</span></div><div class="card stat"><b>' + st.best + '</b><span>best streak</span></div>' +
+    '<div class="card stat"><b>' + days + '</b><span>days practised</span></div><div class="card stat"><b>' + pct + '%</b><span>solved with no help</span></div>' +
+    '<div class="card stat"><b>' + qRight + '/' + qSeen + '</b><span>predict questions right</span></div></div>' +
+    '<p>' + msg + '</p>' +
+    '<div><h2 class="sec-h">Last 12 weeks</h2><p class="sub" style="margin-bottom:8px">Each square is a day. Darker means more work.</p><div class="heat">' + cells + '</div></div>' +
+    '<div><h2 class="sec-h">Every problem</h2><div class="legend" style="margin:6px 0 10px"><span><i style="background:var(--good)"></i>On my own</span><span><i style="background:var(--accent)"></i>With hints</span><span><i style="background:var(--bad)"></i>Studied solution</span><span><i style="background:var(--h0)"></i>Not tried</span></div>' +
+    '<div class="card" style="display:flex;flex-direction:column;gap:12px">' + lvRows + '</div></div>' +
+    '<div><h2 class="sec-h">Review queue</h2><div style="margin-top:8px">' + rqHtml + '</div></div>' +
+    '<div class="card"><h2 class="sec-h" style="font-size:19px">Backup</h2><p class="sub" id="syncline" style="margin:4px 0 10px">' + syncText() + '</p>' +
+    '<div class="row"><button class="btn sm" data-act="exportp">Copy progress</button></div>' +
+    '<textarea id="bk" class="bk" placeholder="Paste a progress backup here to restore it" aria-label="Backup text" style="margin-top:10px"></textarea>' +
+    '<div class="row" style="margin-top:8px"><button class="btn sm" data-act="restore" id="restorebtn">Restore from backup</button><span class="note" id="bkmsg"></span></div></div></div>';
+}
+
+/* ---------- render ---------- */
+const VIEWS = { today: viewToday, problems: viewProblems, predict: viewPredict, progress: viewProgress };
+function render() {
+  renderTabs();
+  if (ui.pid) { $('#view').innerHTML = viewProblem(); setupEditor(); return; }
+  $('#view').innerHTML = VIEWS[ui.tab]();
+}
+function setTab(t) {
+  ui.tab = t; ui.pid = null; stopTimer();
+  render();
+  window.scrollTo(0, 0);
+}
+
+/* ---------- problem flow ---------- */
+function stopTimer() { if (ui.timer) { clearInterval(ui.timer); ui.timer = null; } }
+function openProblem(id) {
+  ui.pid = id; ui.rev = {}; ui.t0 = Date.now(); ui.result = null;
+  stopTimer();
+  ui.timer = setInterval(() => { const el = $('#tm'); if (el) el.textContent = fmtMs(Date.now() - ui.t0); }, 1000);
+  render();
+  window.scrollTo(0, 0);
+}
+async function setupEditor() {
+  const p = byId(ui.pid), ta = $('#code');
+  if (!ta) return;
+  const local = readLocalCode(p.id);
+  ta.value = local !== null ? local : starterFor(p);
+  let touched = false, trap = true;
+  ta.addEventListener('input', () => { touched = true; writeCode(p.id, ta.value); });
+  ta.addEventListener('focus', () => { trap = true; });
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { trap = false; return; }
+    if (e.key === 'Tab' && !e.shiftKey && trap) {
+      e.preventDefault();
+      const s = ta.selectionStart, en = ta.selectionEnd;
+      ta.value = ta.value.slice(0, s) + '    ' + ta.value.slice(en);
+      ta.selectionStart = ta.selectionEnd = s + 4;
+      touched = true; writeCode(p.id, ta.value);
+    }
+  });
+  const rc = await remoteCode(p.id);
+  if (rc && typeof rc.t === 'string' && !touched && ui.pid === p.id && rc.t !== ta.value) {
+    let lu = 0; try { lu = +localStorage.getItem(codeKey(p.id) + '.u') || 0; } catch (e) { /* ignore */ }
+    if (local === null || (rc.u || 0) > lu) { ta.value = rc.t; try { localStorage.setItem(codeKey(p.id), rc.t); } catch (e) { /* ignore */ } }
+  }
+}
+function finish(claimed) {
+  const p = byId(ui.pid), r = ui.rev;
+  const forced = r.steps || r.sol ? 'peek' : (r.h1 || r.h2 ? 'hint' : 'alone');
+  let mode = claimed;
+  if (MODE_ORDER[forced] < MODE_ORDER[mode]) mode = forced;
+  const rec = S.probs[p.id] || (S.probs[p.id] = { best: null, n: 0, xp: 0 });
+  rec.n++; rec.last = todayKey();
+  const newXp = xpFor(p.lvl, mode);
+  let gain = 0;
+  if (!rec.best || MODE_ORDER[mode] > MODE_ORDER[rec.best]) { gain = newXp - (rec.xp || 0); rec.best = mode; rec.xp = newXp; }
+  const ms = Date.now() - ui.t0;
+  if (mode === 'alone' && (!rec.ms || ms < rec.ms)) rec.ms = ms;
+  award(gain, true);
+  let bonus = 0;
+  const d = dayRec();
+  if (d.mission && d.mission.some(x => x.id === p.id)) {
+    d.solved = d.solved || [];
+    if (d.solved.indexOf(p.id) < 0) d.solved.push(p.id);
+    if (!d.bonus && d.mission.every(x => d.solved.indexOf(x.id) >= 0)) { d.bonus = 1; bonus = 25; award(25, false); }
+  }
+  save(); renderHeader(); stopTimer();
+  const downgraded = mode !== claimed;
+  let h = '<div class="result"><b>' + MODE_TXT[mode] + '. ' + (gain + bonus > 0 ? '+' + (gain + bonus) + ' XP' : 'No new XP') + '.</b>';
+  if (downgraded) h += '<p class="sub">You opened ' + (forced === 'peek' ? 'the logic steps or the solution' : 'a hint') + ', so this counts as "' + MODE_TXT[mode].toLowerCase() + '".</p>';
+  if (bonus) h += '<p>Mission bonus earned: +25 XP. All three done today.</p>';
+  if (gain === 0 && !bonus) h += '<p class="sub">You already have a result this good. Repeat reps still keep your streak alive.</p>';
+  if (mode === 'peek') h += '<p class="sub">This one is in your review queue. Redo it from a blank page tomorrow.</p>';
+  if (mode === 'alone' && rec.ms) h += '<p class="sub">Your best time on your own: ' + fmtMs(rec.ms) + '.</p>';
+  h += '<div class="row"><button class="btn primary" data-act="back">Back to missions</button></div></div>';
+  $('#result').innerHTML = h;
+  $('#result').scrollIntoView({ block: 'nearest' });
+}
+
+/* ---------- clipboard ---------- */
+async function copyText(text, btn) {
+  const orig = btn.textContent;
+  let ok = false;
+  try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+    try {
+      const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0';
+      document.body.appendChild(t); t.select(); ok = document.execCommand('copy'); t.remove();
+    } catch (e2) { ok = false; }
+  }
+  btn.textContent = ok ? 'Copied' : 'Select and copy manually';
+  setTimeout(() => { btn.textContent = orig; }, 1600);
+  return ok;
+}
+function arm(btn, armedText, fn) {
+  if (btn.dataset.armed) { clearTimeout(+btn.dataset.armed); delete btn.dataset.armed; btn.classList.remove('armed'); btn.textContent = btn.dataset.orig; fn(); return; }
+  btn.dataset.orig = btn.textContent; btn.textContent = armedText; btn.classList.add('armed');
+  btn.dataset.armed = String(setTimeout(() => { delete btn.dataset.armed; btn.classList.remove('armed'); btn.textContent = btn.dataset.orig; }, 3500));
+}
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]');
+  if (!el) return;
+  const act = el.dataset.act;
+  if (act === 'tab') return setTab(el.dataset.t);
+  if (act === 'open') return openProblem(+el.dataset.id);
+  if (act === 'back') { ui.pid = null; stopTimer(); render(); window.scrollTo(0, 0); return; }
+  if (act === 'flv') { ui.f.lv = +el.dataset.l; render(); return; }
+  if (act === 'copycode') return copyText($('#code').value, el);
+  if (act === 'copyin') return copyText(byId(ui.pid).in, el);
+  if (act === 'copysol') return copyText(byId(ui.pid).code, el);
+  if (act === 'resetcode') {
+    return arm(el, 'Tap again to erase your code', () => {
+      const p = byId(ui.pid); $('#code').value = starterFor(p); writeCode(p.id, $('#code').value);
+    });
+  }
+  if (act === 'reveal') {
+    const k = el.dataset.k;
+    const doReveal = () => {
+      if (!ui.rev[k]) {
+        ui.rev[k] = true;
+        $('#rv').insertAdjacentHTML('beforeend', revealHtml(k));
+      }
+      el.disabled = true;
+      $('#cap').textContent = capText();
+      const node = $('#rv-' + k); if (node) node.scrollIntoView({ block: 'nearest' });
+    };
+    if (k === 'steps' || k === 'sol') return arm(el, 'Tap again. XP drops to 25%', doReveal);
+    return doReveal();
+  }
+  if (act === 'done') return finish(el.dataset.m);
+  if (act === 'round') { ui.round = { ids: pickRound(), i: 0, picked: null, score: 0, xp: 0, done: false }; ui.tab = 'predict'; ui.pid = null; render(); window.scrollTo(0, 0); return; }
+  if (act === 'endround') { ui.round = null; render(); return; }
+  if (act === 'pick') {
+    const R = ui.round; if (!R || R.picked !== null) return;
+    const q = QUIZ.find(x => x.id === R.ids[R.i]), i = +el.dataset.i, ok = i === q.ans;
+    R.picked = i;
+    const rec = S.quiz[q.id] || (S.quiz[q.id] = { r: 0, w: 0, l: 0, got: 0 });
+    let gain = 0;
+    if (ok) { rec.r++; rec.l = 1; R.score++; gain = rec.got ? 1 : 5; rec.got = 1; } else { rec.w++; rec.l = 0; }
+    R.xp += gain; award(gain, true); save(); renderHeader(); render();
+    return;
+  }
+  if (act === 'next') {
+    const R = ui.round; R.i++; R.picked = null;
+    if (R.i >= R.ids.length) { R.done = true; S.rounds++; save(); }
+    render(); window.scrollTo(0, 0); return;
+  }
+  if (act === 'exportp') return copyText(JSON.stringify(S), el);
+  if (act === 'restore') {
+    return arm(el, 'Tap again to replace current progress', () => {
+      const msg = $('#bkmsg');
+      try {
+        const o = JSON.parse($('#bk').value);
+        if (!o || typeof o !== 'object' || !o.days || !o.probs) throw new Error('shape');
+        S = normalize(o); S.updatedAt = Date.now(); save(); renderHeader(); render();
+      } catch (err) { if (msg) msg.textContent = 'That text is not a valid backup.'; }
+    });
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'fcat') { ui.f.cat = e.target.value; render(); }
+  if (e.target.id === 'fst') { ui.f.st = e.target.value; render(); }
+});
+document.addEventListener('input', e => {
+  if (e.target.id === 'fq') {
+    ui.f.q = e.target.value;
+    const keepPos = e.target.selectionStart;
+    render();
+    const q = $('#fq'); if (q) { q.focus(); q.setSelectionRange(keepPos, keepPos); }
+  }
+});
+
+/* ---------- boot ---------- */
+function boot() {
+  const h = (location.hash || '').replace('#', '');
+  if (VIEWS[h]) ui.tab = h;
+  renderHeader();
+  render();
+  initRemote();
+}
+boot();
+})();
+
+</script>
+
+</body></html>
